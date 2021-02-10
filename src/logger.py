@@ -20,7 +20,7 @@ class Logger:
         print(string.format(name=name, status=status, mode=mode, extra=extra))
 
     def log(self, function=None, level='', verbose=1):
-        level = level.upper()
+        level = level.upper() if level in self.levels else ''
 
         def wrapper(f):
             def wrapper_function(*args, **kwargs):
