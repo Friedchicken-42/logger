@@ -3,28 +3,44 @@ from typing import List
 
 class Logger:
 
-    def __init__(self, custom_levels: List[str] = []):
+    def __init__(self, custom_levels: List[str] = [], size: int = 10):
         self.levels = ['critical', 'error', 'warning', 'info', 'debug']
         self.levels.extend(custom_levels)
         self.lenght = max(len(i) for i in self.levels)
+        self.size = size
 
-    def log(self, function=None, level='warning', verbose=1):
-        level = level.ljust(self.lenght)
+    def write(self, name, status, mode, extra=None):
+        string = '[{name}] | '
+        string += '{status} ' if status else ''
+        string += '{mode}'
+        string += ' > {extra}' if extra else ''
+        name = name.ljust(self.size)[: self.size]
+        status = status.ljust(self.lenght)
+
+        print(string.format(name=name, status=status, mode=mode, extra=extra))
+
+    def log(self, function=None, level='', verbose=1):
+        level = level.upper()
 
         def wrapper(f):
             def wrapper_function(*args, **kwargs):
                 name = f.__name__
 
                 if verbose > 1:
-                    print(f'[{level}] | [{name}] call')
+                    self.write(name, level, 'call')
 
-                f(*args, **kwargs)
+                value = f(*args, **kwargs)
 
                 if verbose:
-                    print(f'[{level}] | [{name}] end')
+                    self.write(name, level, 'end', value)
+
+                return value
 
             return wrapper_function
 
         if callable(function):
             return wrapper(function)
         return wrapper
+
+    def __call__(self, function=None, **kwargs):
+        return self.log(function=function, **kwargs)
