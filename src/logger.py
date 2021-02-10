@@ -19,19 +19,26 @@ class Logger:
 
         print(string.format(name=name, status=status, mode=mode, extra=extra))
 
-    def log(self, function=None, level='', verbose=1):
+    def log(self, function=None, *, level='', verbose=1):
         level = level.upper() if level in self.levels else ''
 
         def wrapper(f):
             def wrapper_function(*args, **kwargs):
                 name = f.__name__
+                ex = None
 
                 if verbose > 1:
                     self.write(name, level, 'call')
 
-                value = f(*args, **kwargs)
+                try:
+                    value = f(*args, **kwargs)
+                except Exception as e:
+                    ex = e
 
-                if verbose:
+                if verbose > 0:
+                    if ex:
+                        self.write(name, level, 'raised', ex)
+                        raise ex
                     self.write(name, level, 'end', value)
 
                 return value
@@ -41,6 +48,16 @@ class Logger:
         if callable(function):
             return wrapper(function)
         return wrapper
+
+    def inject(self, obj, verbose=1):
+        for method_name in dir(obj):
+            method = getattr(obj, method_name)
+            if callable(method) and not method_name.startswith('_'):
+                try:
+                    setattr(obj, method_name, self.log(
+                        method, verbose=verbose))
+                except TypeError:
+                    pass
 
     def __call__(self, function=None, **kwargs):
         return self.log(function=function, **kwargs)
