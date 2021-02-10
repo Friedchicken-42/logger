@@ -26,10 +26,3 @@ def test_call():
         print(f'n : {n}')
         return n
     x(42)
-
-
-def test_fail():
-    @logger
-    def x():
-        raise Exception
-    x()
