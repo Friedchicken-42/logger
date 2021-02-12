@@ -1,63 +1,69 @@
-from typing import List
+import sys
 
 
-class Logger:
+def logger(function=None, *, verbose=['end'], file=sys.stdout):
+    '''logger decorator
+    verbose (start|exception|end)[data]
+    '''
 
-    def __init__(self, custom_levels: List[str] = [], size: int = 10):
-        self.levels = ['critical', 'error', 'warning', 'info', 'debug']
-        self.levels.extend(custom_levels)
-        self.lenght = max(len(i) for i in self.levels)
-        self.size = size
+    verbose = set(verbose)
 
-    def write(self, name, status, mode, extra=None):
-        string = '[{name}] | '
-        string += '{status} ' if status else ''
-        string += '{mode}'
-        string += ' > {extra}' if extra else ''
-        name = name.ljust(self.size)[: self.size]
-        status = status.ljust(self.lenght)
+    def wrapper(f):
+        def check(a, b):
+            assert isinstance(b, set)
+            a = set([a]).union({'all'})
+            return not a.isdisjoint(b)
 
-        print(string.format(name=name, status=status, mode=mode, extra=extra))
+        name = f.__name__[:10].center(10)
 
-    def log(self, function=None, *, level='', verbose=1):
-        level = level.upper() if level in self.levels else ''
+        def _wrapper(*args, **kwargs):
+            if check('start', verbose):
+                print(f'[{name}] start', file=file)
 
-        def wrapper(f):
-            def wrapper_function(*args, **kwargs):
-                name = f.__name__
-                ex = None
+            try:
+                res = f(*args, **kwargs)
+            except Exception as e:
+                if check('exception', verbose):
+                    print(f'[{name}] exception', file=file)
+                raise e
 
-                if verbose > 1:
-                    self.write(name, level, 'call')
+            if check('end', verbose):
+                print(f'[{name}] end', file=file)
 
-                try:
-                    value = f(*args, **kwargs)
-                except Exception as e:
-                    ex = e
+            return res
 
-                if verbose > 0:
-                    if ex:
-                        self.write(name, level, 'raised', ex)
-                        raise ex
-                    self.write(name, level, 'end', value)
+        return _wrapper
 
-                return value
-
-            return wrapper_function
-
-        if callable(function):
-            return wrapper(function)
+    if callable(function):
+        return wrapper(function)
+    else:
         return wrapper
 
-    def inject(self, obj, verbose=1):
+
+def inject(c=None, *, verbose=['end'], file=sys.stdout):
+    def _inject(obj):
         for method_name in dir(obj):
             method = getattr(obj, method_name)
             if callable(method) and not method_name.startswith('_'):
-                try:
-                    setattr(obj, method_name, self.log(
-                        method, verbose=verbose))
-                except TypeError:
-                    pass
+                setattr(obj, method_name, logger(
+                    method, verbose=verbose, file=file))
 
-    def __call__(self, function=None, **kwargs):
-        return self.log(function=function, **kwargs)
+    def wrapper_class(*args, **kwargs):
+        o = c(*args, **kwargs)
+        _inject(o)
+        return o
+
+    def wrapper(c):
+        def _wrapper_class(*args, **kwargs):
+            o = c(*args, **kwargs)
+            _inject(o)
+            return o
+        return _wrapper_class
+
+    if isinstance(c, type):  # class
+        return wrapper_class
+    elif c is not None:  # inject(obj)
+        _inject(c)
+        return c
+    else:  # class + params
+        return wrapper
