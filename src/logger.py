@@ -1,19 +1,18 @@
 import sys
 
 
-def logger(function=None, *, verbose=['end'], file=sys.stdout):
+def check(a, b):
+    b = set(b)
+    a = set([a]).union({'all'})
+    return not a.isdisjoint(b)
+
+
+def logger(function=None, *, verbose=['all'], file=sys.stdout):
     '''logger decorator
     verbose (start|exception|end)[data]
     '''
 
-    verbose = set(verbose)
-
     def wrapper(f):
-        def check(a, b):
-            assert isinstance(b, set)
-            a = set([a]).union({'all'})
-            return not a.isdisjoint(b)
-
         name = f.__name__[:10].center(10)
 
         def _wrapper(*args, **kwargs):
@@ -40,23 +39,32 @@ def logger(function=None, *, verbose=['end'], file=sys.stdout):
         return wrapper
 
 
-def inject(c=None, *, verbose=['end'], file=sys.stdout):
+def inject(c=None, *, verbose=['all'], file=sys.stdout):
     def _inject(obj):
-        for method_name in dir(obj):
-            method = getattr(obj, method_name)
-            if callable(method) and not method_name.startswith('_'):
-                setattr(obj, method_name, logger(
-                    method, verbose=verbose, file=file))
+        for attr in dir(obj):
+            if callable(getattr(obj, attr)) and not attr.startswith('_'):
+                setattr(obj, attr, logger(
+                    getattr(obj, attr), verbose=verbose, file=file))
+                if check('inject', verbose):
+                    print(f'injected "{attr}" in "{obj.__class__.__name__}"')
 
     def wrapper_class(*args, **kwargs):
+        for attr in c.__dict__:
+            if callable(getattr(c, attr)):
+                setattr(c, attr, logger(getattr(c, attr)))
+                if check('inject', verbose):
+                    print(f'injected "{attr}" in "{c.__name__}"')
         o = c(*args, **kwargs)
-        _inject(o)
         return o
 
     def wrapper(c):
         def _wrapper_class(*args, **kwargs):
+            for attr in c.__dict__:
+                if callable(getattr(c, attr)):
+                    setattr(c, attr, logger(getattr(c, attr)))
+                    if check('inject', verbose):
+                        print(f'injected "{attr}" in "{c.__name__}"')
             o = c(*args, **kwargs)
-            _inject(o)
             return o
         return _wrapper_class
 
