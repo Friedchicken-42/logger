@@ -41,35 +41,32 @@ def logger(function=None, *, verbose=['all'], file=sys.stdout):
 
 def inject(c=None, *, verbose=['all'], file=sys.stdout):
     def _inject(obj):
-        for attr in dir(obj):
-            if callable(getattr(obj, attr)) and not attr.startswith('_'):
-                setattr(obj, attr, logger(
-                    getattr(obj, attr), verbose=verbose, file=file))
-                if check('inject', verbose):
-                    print(f'injected "{attr}" in "{obj.__class__.__name__}"')
+        meths = {}
 
-    def wrapper_class(*args, **kwargs):
-        for attr in c.__dict__:
-            if callable(getattr(c, attr)):
-                setattr(c, attr, logger(getattr(c, attr)))
+        for attr, function in obj.__class__.__dict__.items():
+            if callable(getattr(obj, attr)) and attr != '__init__':
                 if check('inject', verbose):
-                    print(f'injected "{attr}" in "{c.__name__}"')
-        o = c(*args, **kwargs)
-        return o
+                    print(
+                        f'inject "{attr[:10].center(10)}" in "{obj.__class__.__name__[:10].center(10)}"    id: "{id(obj)}"')
+                meths[attr] = logger(
+                    function=function, verbose=verbose, file=file)
+
+        obj.__class__ = type(obj.__class__.__name__, (obj.__class__,), meths)
 
     def wrapper(c):
-        def _wrapper_class(*args, **kwargs):
-            for attr in c.__dict__:
-                if callable(getattr(c, attr)):
-                    setattr(c, attr, logger(getattr(c, attr)))
-                    if check('inject', verbose):
-                        print(f'injected "{attr}" in "{c.__name__}"')
-            o = c(*args, **kwargs)
-            return o
-        return _wrapper_class
+        name = c.__name__[:10].center(10)
+
+        def _wrapper(*args, **kwargs):
+            if check('init', verbose):
+                print(f'[{name}] init {args, kwargs}', file=file)
+            obj = c(*args, **kwargs)
+            _inject(obj)
+            return obj
+
+        return _wrapper
 
     if isinstance(c, type):  # class
-        return wrapper_class
+        return wrapper(c)
     elif c is not None:  # inject(obj)
         _inject(c)
         return c

@@ -38,3 +38,17 @@ def test_obj():
     t3 = Test3(1, 2)
     t3 = inject(t3, verbose=['all'])
     t3.inc3()
+
+
+def test_eq():
+    @inject
+    class Test:
+        def __init__(self, x):
+            self.x = x
+
+        def __eq__(self, o):
+            return self.x == o.x
+
+    t1 = Test(1)
+    t2 = Test(1)
+    assert t1 == t2
